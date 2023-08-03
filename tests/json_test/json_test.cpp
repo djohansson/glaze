@@ -4517,8 +4517,9 @@ suite json_logging = [] {
       glz::tuplet::get<0>(map.value) = "aa"; // testing lvalue reference storage
 
       std::string s{};
-      glz::write_json(obj, s);
+      auto sz = glz::write_json(obj, s);
 
+      expect(sz == s.size());
       expect(
          s ==
          R"({"pi":3.141,"happy":true,"name":"Stephen","map":{"aa":1,"b":2,"c":3},"arr":["Hello","World",2],"vec":[1,2,3]})")
@@ -4594,7 +4595,8 @@ suite constexpr_values_test = [] {
    "constexpr_values_write"_test = [] {
       cx_values obj{};
       std::string s{};
-      glz::write_json(obj, s);
+      auto sz = glz::write_json(obj, s);
+      expect(sz == s.size());
       expect(s == R"({"info":"information","index":42,"value":""})");
    };
 

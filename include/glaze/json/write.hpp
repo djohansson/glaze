@@ -967,13 +967,13 @@ namespace glz
    } // namespace detail
 
    template <class T, class Buffer>
-   [[nodiscard]] inline auto write_json(T&& value, Buffer&& buffer) noexcept
+   inline auto write_json(T&& value, Buffer&& buffer) noexcept
    {
       return write<opts{}>(std::forward<T>(value), std::forward<Buffer>(buffer));
    }
 
    template <class T>
-   [[nodiscard]] inline auto write_json(T&& value) noexcept
+   inline auto write_json(T&& value) noexcept
    {
       std::string buffer{};
       write<opts{}>(std::forward<T>(value), buffer);

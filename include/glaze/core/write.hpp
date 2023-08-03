@@ -29,7 +29,7 @@ namespace glz
    // For writing to a std::string, std::vector<char>, std::deque<char> and
    // the like
    template <opts Opts, class T, output_buffer Buffer>
-   inline void write(T&& value, Buffer& buffer, is_context auto&& ctx) noexcept
+   inline size_t write(T&& value, Buffer& buffer, is_context auto&& ctx) noexcept
    {
       if constexpr (detail::resizeable<Buffer>) {
          if (buffer.empty()) {
@@ -41,13 +41,14 @@ namespace glz
       if constexpr (detail::resizeable<Buffer>) {
          buffer.resize(ix);
       }
+      return ix;
    }
 
    template <opts Opts, class T, output_buffer Buffer>
-   inline void write(T&& value, Buffer& buffer) noexcept
+   inline size_t write(T&& value, Buffer& buffer) noexcept
    {
       context ctx{};
-      write<Opts>(std::forward<T>(value), buffer, ctx);
+      return write<Opts>(std::forward<T>(value), buffer, ctx);
    }
 
    template <opts Opts, class T, raw_buffer Buffer>
