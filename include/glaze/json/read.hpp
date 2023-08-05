@@ -6,6 +6,7 @@
 #include <charconv>
 #include <climits>
 #include <cwchar>
+#include <filesystem>
 #include <iterator>
 #include <locale>
 #include <ranges>
@@ -175,19 +176,20 @@ namespace glz
                   return;
             }
 
-            // TODO: fix this
-            using X = std::conditional_t<std::is_const_v<std::remove_pointer_t<std::remove_reference_t<decltype(it)>>>,
-                                         const uint8_t*, uint8_t*>;
-            auto cur = reinterpret_cast<X>(it);
             using V = std::decay_t<decltype(value)>;
-            if constexpr (sizeof(V) < 8 && int_t<V>) {
-               std::conditional_t<std::is_unsigned_v<V>, uint64_t, int64_t> i{};
-               auto s = parse_number<std::decay_t<decltype(i)>, Options.force_conformance>(i, cur);
-               if (!s) [[unlikely]] {
-                  ctx.error = error_code::parse_number_failure;
-                  return;
-               }
+            if constexpr (int_t<V>) {
                if constexpr (std::is_unsigned_v<V>) {
+                  uint64_t i{};
+                  if (*it == '-') {
+                     ctx.error = error_code::parse_number_failure;
+                     return;
+                  }
+                  auto e = stoui64(i, it);
+                  if (!e) [[unlikely]] {
+                     ctx.error = error_code::parse_number_failure;
+                     return;
+                  }
+
                   if (i > std::numeric_limits<V>::max()) [[unlikely]] {
                      ctx.error = error_code::parse_number_failure;
                      return;
@@ -195,22 +197,38 @@ namespace glz
                   value = static_cast<V>(i);
                }
                else {
-                  if (i > std::numeric_limits<V>::max() || i < std::numeric_limits<V>::min()) [[unlikely]] {
+                  uint64_t i{};
+                  int sign = 1;
+                  if (*it == '-') {
+                     sign = -1;
+                     ++it;
+                  }
+                  auto e = stoui64(i, it);
+                  if (!e) [[unlikely]] {
                      ctx.error = error_code::parse_number_failure;
                      return;
                   }
-                  value = static_cast<V>(i);
+
+                  if (i > std::numeric_limits<V>::max()) [[unlikely]] {
+                     ctx.error = error_code::parse_number_failure;
+                     return;
+                  }
+                  value = sign * static_cast<V>(i);
                }
             }
             else {
-               auto s = parse_number<V, Options.force_conformance>(value, cur);
+               // TODO: fix this
+               using X =
+                  std::conditional_t<std::is_const_v<std::remove_pointer_t<std::remove_reference_t<decltype(it)>>>,
+                                     const uint8_t*, uint8_t*>;
+               auto cur = reinterpret_cast<X>(it);
+               auto s = parse_float<V, Options.force_conformance>(value, cur);
                if (!s) [[unlikely]] {
                   ctx.error = error_code::parse_number_failure;
                   return;
                }
+               it = reinterpret_cast<std::remove_reference_t<decltype(it)>>(cur);
             }
-
-            it = reinterpret_cast<std::remove_reference_t<decltype(it)>>(cur);
 
             if constexpr (Options.quoted) {
                match<'"'>(ctx, it, end);
@@ -233,7 +251,7 @@ namespace glz
       template <class T, class Val, class It, class End>
       GLZ_ALWAYS_INLINE void read_escaped_unicode(Val& value, is_context auto&& ctx, It&& it, End&& end)
       {
-         // TODO: this is slow but who is escaping unicode nowadays
+         // This is slow but who is escaping unicode nowadays
          // codecvt is problematic on mingw hence mixing with the c character conversion functions
          if (std::distance(it, end) < 4 || !std::all_of(it, it + 4, ::isxdigit)) [[unlikely]] {
             ctx.error = error_code::u_requires_hex_digits;
@@ -2027,13 +2045,5 @@ namespace glz
       }
 
       return read<Opts>(value, buffer, ctx);
-   }
-
-   template <auto Opts = opts{}, class T>
-   [[deprecated("use the version that takes a buffer as the third argument")]] GLZ_ALWAYS_INLINE parse_error
-   read_file_json(T& value, const sv file_name) noexcept
-   {
-      std::string buffer{};
-      return read_file_json(value, file_name, buffer);
    }
 }
